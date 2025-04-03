@@ -8,7 +8,8 @@ import Sidebar from './components/Sidebar';
 const electron = window.electron;
 
 function App() {
-  const [apiKey, setApiKey] = useState('');
+  // Initialize apiKey state to null initially to differentiate between empty and not yet loaded
+  const [apiKey, setApiKey] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('idle'); // idle, requesting_access, recording, processing, transcribing, summarizing, complete, error, viewing
   const [recordedChunks, setRecordedChunks] = useState([]);
@@ -17,61 +18,57 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
 
-  // Setup event listeners
+  // Setup event listeners, including for API key management
   useEffect(() => {
-    electron.receive('recording-started', () => {
-      setStatus('recording');
+    // Request the stored API key on initial load
+    console.log("Requesting stored API key...");
+    electron.send('get-api-key');
+
+    const listeners = {
+      'recording-started': () => setStatus('recording'),
+      'recording-save-cancelled': () => setStatus('idle'),
+      'recording-save-error': (errorMsg) => { setError(`Error saving recording: ${errorMsg}`); setStatus('error'); },
+      'processing-started': () => setStatus('processing'),
+      'transcribing-audio': () => setStatus('transcribing'),
+      'generating-summary': () => setStatus('summarizing'),
+      'processing-complete': (data) => { setResults(data); setStatus('complete'); },
+      'processing-error': (errorMsg) => { setError(`Error processing recording: ${errorMsg}`); setStatus('error'); },
+      // *** NEW: Handle loaded API key ***
+      'api-key-loaded': (loadedKey) => {
+        console.log("Received API key from main:", loadedKey ? 'Key received' : 'No key stored');
+        setApiKey(loadedKey || ''); // Set to empty string if no key is stored
+      },
+      // *** NEW: Handle confirmation of cleared key ***
+      'api-key-cleared': () => {
+        console.log("API key confirmed cleared.");
+        setApiKey(''); // Ensure frontend state is also cleared
+      }
+    };
+
+    // Register listeners
+    Object.entries(listeners).forEach(([channel, handler]) => {
+      electron.receive(channel, handler);
     });
 
-    electron.receive('recording-save-cancelled', () => {
-      setStatus('idle');
-    });
-
-    electron.receive('recording-save-error', (errorMsg) => {
-      setError(`Error saving recording: ${errorMsg}`);
-      setStatus('error');
-    });
-
-    electron.receive('processing-started', () => {
-      setStatus('processing');
-    });
-
-    electron.receive('transcribing-audio', () => {
-      setStatus('transcribing');
-    });
-
-    electron.receive('generating-summary', () => {
-      setStatus('summarizing');
-    });
-
-    electron.receive('processing-complete', (data) => {
-      setResults(data); // Set results after processing
-      setStatus('complete');
-    });
-
-    electron.receive('processing-error', (errorMsg) => {
-      setError(`Error processing recording: ${errorMsg}`);
-      setStatus('error');
-    });
-
-    // Cleanup on unmount
+    // Cleanup on unmount (conceptual, as bridge might not support removeListener)
     return () => {
-      // Stop any ongoing recording/stream
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      // Ideally, remove listeners here if possible with the bridge API
     };
-  }, [stream]);
+  }, [stream]); // Added stream dependency back, it was removed before
 
-  // Handle start recording
+  // Handle start recording - No longer sends API key explicitly
   const startRecording = async () => {
-    // Clear previous results/errors when starting a new recording
-    setResults(null);
+    setResults(null); 
     setError(null);
     setStatus('requesting_access');
 
     try {
-      const apiKeyToUse = apiKey;
+      // *** No need to get apiKeyToUse here, main process already has it ***
+      // const apiKeyToUse = apiKey; 
+
       console.log("Attempting to get audio stream...");
       let audioStream;
       try {
@@ -101,7 +98,7 @@ function App() {
         }
       }
        if (!options.mimeType) console.warn('No specific audio mime type supported, using default.');
-       
+
       const recorder = new MediaRecorder(audioStream, options);
       setMediaRecorder(recorder);
 
@@ -113,7 +110,21 @@ function App() {
       recorder.start(1000);
       setIsRecording(true);
       setStatus('recording');
-      electron.send('start-recording', { apiKey: apiKeyToUse });
+      
+      // *** Notify main process - Send API key ONLY IF IT WAS JUST ENTERED ***
+      // We send it here so the main process can store it immediately.
+      // If the key was already loaded, we don't need to send it again.
+      // Check if the apiKey state has a value (meaning it was either loaded or just entered)
+      if (apiKey) { 
+          electron.send('start-recording', { apiKey: apiKey });
+      } else {
+          // This case should ideally not be reachable if the UI prevents recording without a key
+          console.error("Attempting to start recording without an API key in the frontend state.");
+          setError("API Key not set. Please provide an API Key.");
+          setStatus('error');
+          return;
+      }
+
     } catch (err) {
       console.error('Unexpected error in startRecording:', err);
       setError(`Failed to start audio recording: ${err.message}`);
@@ -157,6 +168,13 @@ function App() {
     if (drawerCheckbox) drawerCheckbox.checked = false;
   };
 
+  // *** NEW: Handle clearing API key ***
+  const handleClearApiKey = () => {
+      console.log("Requesting to clear API key...");
+      electron.send('clear-api-key');
+      // State will be updated via 'api-key-cleared' listener
+  };
+
   return (
     <div className="drawer lg:drawer-open">
       <input id="recordings-drawer" type="checkbox" className="drawer-toggle" />
@@ -176,9 +194,17 @@ function App() {
           <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-6 text-center text-primary hidden lg:block">Meet Recap</h1>
 
-            {!apiKey ? (
-              <ApiKeyForm setApiKey={setApiKey} />
+            {/* Show loading or form/app based on apiKey state */}
+            {apiKey === null ? (
+              // Optional: Show a loading indicator while checking for stored key
+              <div className="text-center p-10">
+                  <span className="loading loading-ring loading-lg"></span>
+              </div>
+            ) : !apiKey ? (
+              // If apiKey is explicitly empty string, show the form
+              <ApiKeyForm setApiKey={setApiKey} /> // Pass setApiKey so the form can update it
             ) : (
+              // If apiKey has a value, show the main app content
               <>
                 {status !== 'viewing' && (
                   <RecordingComponent 
@@ -190,25 +216,26 @@ function App() {
                   />
                 )}
                 
+                {/* Button to clear API key - Now calls handleClearApiKey */}
                 <div className="mt-4 flex items-center justify-center gap-4 text-sm text-base-content/70">
-                  <span>API key is set.</span>
-                  <button 
-                    className="btn btn-xs btn-ghost"
-                    onClick={() => setApiKey('')}
-                  >
-                    Clear API Key
-                  </button>
-                  {status === 'viewing' && (
-                     <button 
-                      className="btn btn-xs btn-outline btn-primary"
-                      onClick={() => {
-                        setResults(null);
-                        setStatus('idle');
-                      }}
-                    >
-                      New Recording
-                    </button>
-                  )}
+                   <span>API key is set.</span>
+                   <button 
+                     className="btn btn-xs btn-ghost"
+                     onClick={handleClearApiKey} // Use the new handler
+                   >
+                     Clear API Key
+                   </button>
+                   {status === 'viewing' && (
+                      <button 
+                       className="btn btn-xs btn-outline btn-primary"
+                       onClick={() => {
+                         setResults(null); 
+                         setStatus('idle');  
+                       }}
+                     >
+                       New Recording
+                     </button>
+                   )}
                 </div>
 
                 {status === 'processing' && <div className="alert alert-info mt-4">Processing recording...</div>}
@@ -220,17 +247,16 @@ function App() {
                 )}
 
                 {status === 'error' && error && (
-                  <div role="alert" className="alert alert-error mt-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2 2m2-2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>{error}</span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
+                   <div role="alert" className="alert alert-error mt-4">
+                     <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2 2m2-2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                     <span>{error}</span>
+                   </div>
+                 )}
+              </> 
+            )} 
+          </div> 
+        </div> 
+      </div> 
       <Sidebar onSelectRecording={handleSelectRecording} />
     </div>
   );

@@ -5,10 +5,44 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const { OpenAI } = require('openai');
 
+// *** NEW: Define path for simple config file ***
+const configPath = path.join(app.getPath('userData'), 'meet-recap-config.json');
+console.log('Using config file path:', configPath);
+
 let mainWindow;
 
-// Store API key
-let openaiApiKey = '';
+// *** NEW: Function to load API key from our simple file ***
+function loadApiKeyFromFile() {
+  try {
+    if (fs.existsSync(configPath)) {
+      const rawData = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(rawData);
+      console.log('Loaded API key from file.');
+      return config.openaiApiKey || '';
+    } else {
+      console.log('Config file not found, no API key loaded.');
+    }
+  } catch (error) {
+    console.error('Error loading API key from file:', error);
+  }
+  return ''; // Return empty string on error or if file not found
+}
+
+// *** NEW: Function to save API key to our simple file ***
+function saveApiKeyToFile(key) {
+  try {
+    const config = { openaiApiKey: key };
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log('Saved API key to file.');
+  } catch (error) {
+    console.error('Error saving API key to file:', error);
+  }
+}
+
+// Store API key in memory (for current session)
+// Load initial value using our new function
+let openaiApiKey = loadApiKeyFromFile();
+console.log('API Key state after load:', openaiApiKey ? '***' : 'null or empty');
 
 // Simplified function to return a static default display name
 function formatDefaultDisplayName(name) {
@@ -128,6 +162,11 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
+  // *** NEW: Send stored key after window is ready (optional, safer to wait for request) ***
+  // mainWindow.webContents.on('did-finish-load', () => {
+  //   mainWindow.webContents.send('api-key-loaded', openaiApiKey);
+  // });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -173,14 +212,18 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle start recording
+// *** UPDATED: Handle start recording -> Save key using our function ***
 ipcMain.on('start-recording', (event, options) => {
-  // Store API key for later use
+  // Store API key in memory AND persist it using our function
   if (options && options.apiKey) {
     openaiApiKey = options.apiKey;
+    saveApiKeyToFile(openaiApiKey); // Use our save function
+  } else if (!openaiApiKey) {
+      console.error('start-recording called without a valid API key.');
+      // Potentially notify renderer about missing key error if needed
+      return; 
   }
   
-  // Reply to renderer that recording has started
   event.reply('recording-started');
 });
 
@@ -403,4 +446,18 @@ ipcMain.on('update-meeting-details', (event, { jsonPath, displayName, tags }) =>
   } catch (error) {
     console.error('Error updating meeting details:', error);
   }
+});
+
+// Handler to provide the API key to the renderer (no change needed here)
+ipcMain.on('get-api-key', (event) => {
+  console.log('Renderer requested API key.');
+  event.reply('api-key-loaded', openaiApiKey);
+});
+
+// *** UPDATED: Handler to clear the API key using our function ***
+ipcMain.on('clear-api-key', (event) => {
+  console.log('Clearing stored API key (using file).');
+  openaiApiKey = ''; // Clear in memory
+  saveApiKeyToFile(''); // Save empty string to file to clear it
+  event.reply('api-key-cleared'); // Confirm to renderer
 }); 

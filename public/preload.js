@@ -7,12 +7,13 @@ contextBridge.exposeInMainWorld(
   {
     // For sending messages to main process
     send: (channel, data) => {
-      // Whitelist channels
       const validChannels = [
         'start-recording',
         'stop-recording',
         'get-recordings',
-        'update-meeting-details'
+        'update-meeting-details',
+        'get-api-key',
+        'clear-api-key'
       ];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
@@ -29,7 +30,9 @@ contextBridge.exposeInMainWorld(
         'generating-summary',
         'processing-complete',
         'processing-error',
-        'recordings-updated'
+        'recordings-updated',
+        'api-key-loaded',
+        'api-key-cleared'
       ];
       if (validChannels.includes(channel)) {
         // Deliberately strip event as it includes `sender`
