@@ -190,7 +190,7 @@ function App() {
     <div className="min-h-screen bg-base-200 p-4 md:p-8 font-sans">
       {/* Main content container with card styling */}
       <div className="container mx-auto bg-base-100 p-6 rounded-lg shadow-lg max-w-4xl"> {/* Adjusted max-width */}
-        <h1 className="text-3xl font-bold mb-6 text-center text-primary">Meeting Recorder & Summarizer</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center text-primary">Meet Recap</h1>
 
         {/* Conditional rendering for API Key Form or Recording Area */} 
         {!apiKey ? (

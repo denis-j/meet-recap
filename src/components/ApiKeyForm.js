@@ -11,21 +11,22 @@ function ApiKeyForm({ setApiKey }) {
   };
 
   return (
-    <div className="api-key-form">
-      <h2>OpenAI API Key</h2>
-      <p>
+    <div className="card w-96 bg-base-100 shadow-xl p-6 mx-auto mt-10">
+      <h2 className="card-title text-2xl mb-4">OpenAI API Key</h2>
+      <p className="text-base-content/80 mb-6">
         Enter your OpenAI API key to use transcription and summarization features.
         Your key is stored locally and never sent to any server other than OpenAI.
       </p>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="form-control gap-4">
         <input
           type="password"
           value={inputKey}
           onChange={(e) => setInputKey(e.target.value)}
           placeholder="Enter your OpenAI API key"
+          className="input input-bordered w-full"
           required
         />
-        <button type="submit">Save Key</button>
+        <button type="submit" className="btn btn-primary w-full">Save Key</button>
       </form>
     </div>
   );

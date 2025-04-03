@@ -178,7 +178,9 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
         model: "whisper-1",
       });
 
-      console.log("Transcription successful:", transcription.text);
+      console.log("Transcription successful. Length:", transcription.text.length);
+      console.log("First 100 chars of transcription:", transcription.text.substring(0, 100));
+      
       event.reply('generating-summary');
 
       // Generate a summary using OpenAI
@@ -197,13 +199,19 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
       });
 
       console.log("Summary generation successful.");
+      console.log("Raw summary response:", JSON.stringify(summary, null, 2));
+      console.log("Summary content:", summary.choices[0].message.content);
+
       // Send the results back to the renderer
-      event.reply('processing-complete', {
+      const resultsToSend = {
         transcript: transcription.text,
         summary: summary.choices[0].message.content,
-        audioFilePath, // Path to the saved audio file
-        videoFilePath: null // No video file anymore
-      });
+        audioFilePath,
+        videoFilePath: null
+      };
+      
+      console.log("Sending results to renderer. Summary length:", resultsToSend.summary.length);
+      event.reply('processing-complete', resultsToSend);
 
     } catch (error) {
       console.error('Error processing audio recording:', error);
