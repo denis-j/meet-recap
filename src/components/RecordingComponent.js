@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import "../index.css"
 
 function RecordingComponent({ isRecording, startRecording, stopRecording, stream }) {
   const videoRef = useRef(null);
@@ -20,7 +21,7 @@ function RecordingComponent({ isRecording, startRecording, stopRecording, stream
       
       <div className="controls">
         {!isRecording ? (
-          <button onClick={startRecording}>Start Recording</button>
+          <button className='btn' onClick={startRecording}>Start Recording</button>
         ) : (
           <button onClick={stopRecording}>Stop Recording</button>
         )}

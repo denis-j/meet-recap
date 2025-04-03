@@ -186,49 +186,60 @@ function App() {
   };
 
   return (
-    <div className="container">
-      <h1>Meeting Recorder & Summarizer</h1>
-      
-      {!apiKey && (
-        <ApiKeyForm setApiKey={setApiKey} />
-      )}
-      
-      {apiKey && (
-        <RecordingComponent 
-          isRecording={isRecording}
-          startRecording={startRecording}
-          stopRecording={stopRecording}
-          status={status}
-        />
-      )}
-      
-      {status === 'processing' && (
-        <div className="status loading">
-          Processing recording...
-        </div>
-      )}
-      
-      {status === 'transcribing' && (
-        <div className="status loading">
-          Transcribing audio...
-        </div>
-      )}
-      
-      {status === 'summarizing' && (
-        <div className="status loading">
-          Generating summary...
-        </div>
-      )}
-      
-      {status === 'complete' && results && (
-        <ResultsComponent results={results} />
-      )}
-      
-      {status === 'error' && error && (
-        <div className="error">
-          {error}
-        </div>
-      )}
+    // Apply Tailwind classes for background, padding, and potentially font
+    <div className="min-h-screen bg-base-200 p-4 md:p-8 font-sans">
+      {/* Main content container with card styling */}
+      <div className="container mx-auto bg-base-100 p-6 rounded-lg shadow-lg max-w-4xl"> {/* Adjusted max-width */}
+        <h1 className="text-3xl font-bold mb-6 text-center text-primary">Meeting Recorder & Summarizer</h1>
+
+        {/* Conditional rendering for API Key Form or Recording Area */} 
+        {!apiKey ? (
+          <ApiKeyForm setApiKey={setApiKey} /> 
+        ) : (
+          <>
+            <RecordingComponent 
+              isRecording={isRecording}
+              startRecording={startRecording}
+              stopRecording={stopRecording}
+              status={status}
+            />
+            {/* Button to clear API key */} 
+            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-base-content/70">
+              <span>API key is set.</span> 
+              <button 
+                className="btn btn-xs btn-ghost"
+                onClick={() => setApiKey('')} // Clear the API key state
+              >
+                Clear API Key
+              </button>
+            </div>
+          </>
+        )}
+        
+        {/* Status messages */} 
+        {status === 'processing' && (
+          <div className="status loading text-info text-center mt-4 p-2 bg-info/10 rounded-md">Processing recording...</div>
+        )}
+        {status === 'transcribing' && (
+          <div className="status loading text-info text-center mt-4 p-2 bg-info/10 rounded-md">Transcribing audio...</div>
+        )}
+        {status === 'summarizing' && (
+          <div className="status loading text-info text-center mt-4 p-2 bg-info/10 rounded-md">Generating summary...</div>
+        )}
+        
+        {/* Results Component Area */} 
+        {status === 'complete' && results && (
+          <ResultsComponent results={results} />
+        )}
+        
+        {/* Error Alert */} 
+        {status === 'error' && error && (
+          <div role="alert" className="alert alert-error mt-4 shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2 2m2-2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>{error}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
