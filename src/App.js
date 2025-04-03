@@ -212,7 +212,7 @@ function App() {
   };
 
   return (
-    <div className="drawer lg:drawer-open">
+    <div className="drawer lg:drawer-open" data-theme="cupcake">
       <input id="recordings-drawer" type="checkbox" className="drawer-toggle" />
       <div className="drawer-content flex flex-col">
         <div className="navbar bg-base-100 shadow-sm lg:hidden sticky top-0 z-10">

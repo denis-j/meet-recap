@@ -71,7 +71,7 @@ function ResultsComponent({ results, isViewing }) {
   };
 
   return (
-    <div className="mt-8 card bg-base-100 shadow-xl">
+    <div className="mt-8 card bg-base-100 shadow-xl" data-theme="cupcake">
       <div className="card-body p-0">
         <div className="p-6 pb-0">
           <div className="flex justify-between items-center mb-4">
