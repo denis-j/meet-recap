@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recording</title>
+    <!-- Use CDN for DaisyUI/Tailwind (simpler for separate window) -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.19.1/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Make window draggable */
+        body {
+            -webkit-app-region: drag;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: system-ui, sans-serif;
+            border-radius: 0.5rem; /* Match body radius if needed */
+        }
+        /* Make buttons non-draggable */
+        button {
+            -webkit-app-region: no-drag;
+        }
+        body {
+            user-select: none; /* Prevent text selection */
+        }
+    </style>
+</head>
+<body class="bg-base-200 rounded-lg p-3 flex items-center justify-between gap-3 shadow-lg">
+
+    <div class="flex items-center gap-2">
+         <!-- Recording indicator -->
+         <span class="relative flex h-3 w-3">
+           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+           <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+         </span>
+         <span id="timer" class="font-mono text-lg font-semibold text-base-content">00:00</span>
+    </div>
+
+    <button id="stop-btn" class="btn btn-error btn-sm">Stop</button>
+
+    <!-- Link to the preload script -->
+    <script src="./mini-player-renderer.js"></script>
+</body>
+</html>

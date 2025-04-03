@@ -32,12 +32,17 @@ contextBridge.exposeInMainWorld(
         'processing-error',
         'recordings-updated',
         'api-key-loaded',
-        'api-key-cleared'
+        'api-key-cleared',
+        'trigger-stop-recording'
       ];
       if (validChannels.includes(channel)) {
-        // Deliberately strip event as it includes `sender`
-        ipcRenderer.on(channel, (event, ...args) => func(...args));
+        const listener = (event, ...args) => func(...args);
+        ipcRenderer.on(channel, listener);
+        // Return cleanup function
+        return () => ipcRenderer.removeListener(channel, listener);
       }
+      // Return no-op cleanup if channel is invalid
+      return () => {};
     }
   }
 );

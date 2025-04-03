@@ -10,6 +10,10 @@ const configPath = path.join(app.getPath('userData'), 'meet-recap-config.json');
 console.log('Using config file path:', configPath);
 
 let mainWindow;
+// *** NEW: Variables for mini window and timer ***
+let miniWindow = null;
+let recordingInterval = null;
+let recordingSeconds = 0;
 
 // *** NEW: Function to load API key from our simple file ***
 function loadApiKeyFromFile() {
@@ -212,29 +216,64 @@ app.on('window-all-closed', () => {
   }
 });
 
-// *** UPDATED: Handle start recording -> Save key using our function ***
+// *** UPDATED: Handle start recording ***
 ipcMain.on('start-recording', (event, options) => {
-  // Store API key in memory AND persist it using our function
+  if (recordingInterval) {
+      console.warn('Recording already in progress, ignoring start command.');
+      return;
+  }
+  // Store API key
   if (options && options.apiKey) {
     openaiApiKey = options.apiKey;
-    saveApiKeyToFile(openaiApiKey); // Use our save function
+    saveApiKeyToFile(openaiApiKey); 
   } else if (!openaiApiKey) {
       console.error('start-recording called without a valid API key.');
-      // Potentially notify renderer about missing key error if needed
       return; 
   }
   
+  // Reply to renderer that recording has started
   event.reply('recording-started');
+
+  // *** Start Timer and Open Mini Window ***
+  recordingSeconds = 0;
+  createMiniWindow(); // Create and show the mini window
+
+  // Start the timer interval (runs in main process)
+  recordingInterval = setInterval(() => {
+      recordingSeconds++;
+      const minutes = Math.floor(recordingSeconds / 60);
+      const seconds = recordingSeconds % 60;
+      const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      // Send time update to mini window if it exists
+      if (miniWindow && !miniWindow.isDestroyed()) {
+          miniWindow.webContents.send('update-timer', timeString);
+      }
+  }, 1000);
+  console.log('Recording timer started.');
+
 });
 
-// Handle stop recording
-ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuffer and mimeType
+// *** UPDATED: Handle stop recording (from main window or other sources) ***
+ipcMain.on('stop-recording', async (event, data) => { 
+  // *** Stop Timer and Close Mini Window ***
+  if (recordingInterval) {
+    clearInterval(recordingInterval);
+    recordingInterval = null;
+    recordingSeconds = 0;
+    console.log('Recording timer stopped.');
+  }
+  if (miniWindow && !miniWindow.isDestroyed()) {
+    console.log('Closing mini window from main stop handler.');
+    miniWindow.close();
+    miniWindow = null;
+  }
+
+  // --- Original stop-recording logic continues below --- 
   try {
-    const { audioBuffer, mimeType } = data;
+    const { audioBuffer, mimeType } = data; 
     if (!audioBuffer) {
         throw new Error("No audio buffer received");
     }
-
     // --- FIX: Ensure audioBuffer is a Buffer --- 
     let bufferToWrite;
     // Check if it arrived as an object with numeric keys (common IPC serialization)
@@ -401,6 +440,28 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
   }
 });
 
+// *** NEW: Handle stop request from mini window ***
+ipcMain.on('mini-stop-recording', () => {
+  console.log('Received stop request from mini window.');
+  // Stop the timer interval
+  if (recordingInterval) {
+      clearInterval(recordingInterval);
+      recordingInterval = null;
+      recordingSeconds = 0;
+      console.log('Recording timer stopped by mini window.');
+  }
+  // Close the mini window
+  if (miniWindow && !miniWindow.isDestroyed()) {
+      miniWindow.close();
+      miniWindow = null;
+  }
+  // Trigger stop in the main window's renderer process
+  if (mainWindow && !mainWindow.isDestroyed()) {
+      console.log('Sending trigger-stop-recording to main window.');
+      mainWindow.webContents.send('trigger-stop-recording');
+  }
+});
+
 // Add new IPC handlers for recordings
 ipcMain.on('get-recordings', () => {
   updateRecordingsList();
@@ -460,4 +521,50 @@ ipcMain.on('clear-api-key', (event) => {
   openaiApiKey = ''; // Clear in memory
   saveApiKeyToFile(''); // Save empty string to file to clear it
   event.reply('api-key-cleared'); // Confirm to renderer
-}); 
+});
+
+// *** NEW: Function to create the mini window ***
+function createMiniWindow() {
+  if (miniWindow) {
+    miniWindow.focus(); // Focus if already exists
+    return;
+  }
+  miniWindow = new BrowserWindow({
+    width: 250, // Adjust size as needed
+    height: 60, // Adjust size as needed
+    frame: false, // No window frame (title bar, etc.)
+    resizable: false,
+    alwaysOnTop: true, // Keep it above other windows
+    fullscreenable: false,
+    show: false, // Don't show immediately
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'mini-player-preload.js') // Use specific preload
+    }
+  });
+
+  miniWindow.loadFile(path.join(__dirname, 'mini-player.html'));
+
+  // Optional: Position the window (e.g., top right)
+  // const { screen } = require('electron');
+  // const primaryDisplay = screen.getPrimaryDisplay();
+  // const { width: screenWidth } = primaryDisplay.workAreaSize;
+  // miniWindow.setPosition(screenWidth - 300, 50);
+
+  miniWindow.once('ready-to-show', () => {
+    miniWindow.show();
+  });
+
+  miniWindow.on('closed', () => {
+    console.log('Mini window closed event.');
+    // Clean up interval if window is closed manually/unexpectedly
+    if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+        console.log('Cleared recording interval due to mini window close.');
+        // Optionally also trigger stop in main window if needed?
+    }
+    miniWindow = null; // Clear reference
+  });
+} 

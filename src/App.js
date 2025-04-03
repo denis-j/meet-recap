@@ -42,6 +42,14 @@ function App() {
       'api-key-cleared': () => {
         console.log("API key confirmed cleared.");
         setApiKey(''); // Ensure frontend state is also cleared
+      },
+      // *** NEW: Listener for stop trigger from mini window ***
+      'trigger-stop-recording': () => {
+          console.log("App received: trigger-stop-recording");
+          // Call the existing stop function if currently recording
+          if (isRecording) { // Check state before calling
+             stopRecording();
+          }
       }
     };
 
@@ -57,7 +65,7 @@ function App() {
       }
       // Ideally, remove listeners here if possible with the bridge API
     };
-  }, [stream]); // Added stream dependency back, it was removed before
+  }, [stream, isRecording]); // Add isRecording dependency for the trigger listener check
 
   // Handle start recording - No longer sends API key explicitly
   const startRecording = async () => {
@@ -134,27 +142,55 @@ function App() {
 
   // Handle stop recording
   const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-
-      mediaRecorder.onstop = () => {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-        const blobMimeType = mediaRecorder.mimeType || 'audio/webm';
-        console.log("Creating Blob with mimeType:", blobMimeType);
-        const blob = new Blob(recordedChunks, { type: blobMimeType });
-
-        blob.arrayBuffer().then(buffer => {
-          electron.send('stop-recording', { 
-              audioBuffer: new Uint8Array(buffer), 
-              mimeType: blobMimeType 
-          });
-          setRecordedChunks([]);
-        });
-      };
+    console.log("stopRecording function called in App.js");
+    // Check if recorder exists and is actually recording
+    if (mediaRecorder && mediaRecorder.state === "recording") { 
+      mediaRecorder.stop(); // onstop event will handle the rest
+      setIsRecording(false); // Update state immediately
+      console.log("MediaRecorder stopped.");
+      // No need to set status here, main process will send updates
+    } else {
+        console.warn("stopRecording called but no active media recorder found or not recording.");
+        // Reset state just in case
+        setIsRecording(false);
+        if (status === 'recording') setStatus('idle');
     }
+
+    // The rest of the logic (creating blob, sending to main) 
+    // should be inside mediaRecorder.onstop = () => { ... } 
+    // which is already set up in startRecording (or needs to be adjusted there)
+    // Re-check startRecording to ensure onstop is correctly defined there.
+     if (mediaRecorder) { // Ensure recorder exists before setting onstop if not already set
+         mediaRecorder.onstop = () => {
+           console.log("MediaRecorder onstop event fired.");
+           if (stream) {
+             stream.getTracks().forEach(track => track.stop()); 
+           }
+           if (recordedChunks.length === 0) {
+               console.warn("onstop fired but no recorded chunks found.");
+               setStatus('idle'); // Go back to idle if nothing was recorded
+               return;
+           }
+           const blobMimeType = mediaRecorder.mimeType || 'audio/webm'; 
+           console.log("Creating Blob with mimeType:", blobMimeType);
+           const blob = new Blob(recordedChunks, { type: blobMimeType });
+           setRecordedChunks([]); // Clear chunks immediately after creating blob
+
+           blob.arrayBuffer().then(buffer => {
+             console.log("Sending stop-recording IPC with buffer size:", buffer.byteLength);
+             electron.send('stop-recording', { 
+                 audioBuffer: new Uint8Array(buffer), 
+                 mimeType: blobMimeType 
+             });
+           }).catch(error => {
+                console.error("Error getting array buffer from blob:", error);
+                setError("Failed to process recorded data.");
+                setStatus('error');
+           });
+         };
+     } else {
+         console.error("stopRecording called but mediaRecorder is null.");
+     }
   };
 
   // Handle selecting a recording from the sidebar
