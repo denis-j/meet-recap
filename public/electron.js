@@ -10,6 +10,34 @@ let mainWindow;
 // Store API key
 let openaiApiKey = '';
 
+// Function to get all recordings from the music directory
+function getRecordings() {
+  const musicDir = app.getPath('music');
+  const files = fs.readdirSync(musicDir)
+    .filter(file => file.startsWith('meeting_') && file.endsWith('.webm'))
+    .map(file => {
+      const filePath = path.join(musicDir, file);
+      const stats = fs.statSync(filePath);
+      return {
+        name: file,
+        path: filePath,
+        date: stats.mtime.toLocaleString(),
+        size: (stats.size / (1024 * 1024)).toFixed(2) + ' MB'
+      };
+    })
+    .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date, newest first
+
+  return files;
+}
+
+// Function to update recordings list in renderer
+function updateRecordingsList() {
+  if (mainWindow) {
+    const recordings = getRecordings();
+    mainWindow.webContents.send('recordings-updated', recordings);
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 900,
@@ -136,14 +164,25 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
         if (mimeType.includes('ogg')) fileExtension = '.ogg';
         else if (mimeType.includes('mp4')) fileExtension = '.mp4';
         else if (mimeType.includes('aac')) fileExtension = '.aac';
-        // webm is a good default if unsure
     }
+
+    // Generate filename with current date and time
+    const now = new Date();
+    const dateStr = now.toISOString()
+        .replace(/[:.]/g, '-') // Replace : and . with -
+        .replace('T', '_') // Replace T with _
+        .split('.')[0]; // Remove milliseconds
+    const defaultFileName = `meeting_${dateStr}${fileExtension}`;
+    
+    // Use the Music directory as default save location
+    const musicDir = app.getPath('music');
+    const defaultPath = path.join(musicDir, defaultFileName);
 
     // Ask user where to save the audio recording
     const { filePath } = await dialog.showSaveDialog({
       title: 'Save Audio Recording',
-      defaultPath: path.join(app.getPath('music'), `meeting-audio${fileExtension}`), // Save in Music folder
-      filters: [{ name: 'Audio Files', extensions: [fileExtension.substring(1)] }], // Use correct extension
+      defaultPath: defaultPath,
+      filters: [{ name: 'Audio Files', extensions: [fileExtension.substring(1)] }],
     });
 
     if (!filePath) {
@@ -154,6 +193,9 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
     // Write the correctly converted buffer to disk
     fs.writeFileSync(filePath, bufferToWrite);
     console.log(`Audio saved to: ${filePath}`);
+
+    // Update recordings list immediately after saving
+    updateRecordingsList();
 
     // Generate transcript and summary
     event.reply('processing-started');
@@ -224,4 +266,9 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
     console.error('Error handling stop-recording:', error);
     event.reply('recording-save-error', error.message);
   }
+});
+
+// Add new IPC handlers for recordings
+ipcMain.on('get-recordings', () => {
+  updateRecordingsList();
 }); 

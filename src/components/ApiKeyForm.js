@@ -11,7 +11,7 @@ function ApiKeyForm({ setApiKey }) {
   };
 
   return (
-    <div className="card w-96 bg-base-100 shadow-xl p-6 mx-auto mt-10">
+    <div className="card w-96 bg-base-100 p-6 mx-auto mt-10">
       <h2 className="card-title text-2xl mb-4">OpenAI API Key</h2>
       <p className="text-base-content/80 mb-6">
         Enter your OpenAI API key to use transcription and summarization features.

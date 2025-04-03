@@ -3,24 +3,10 @@ import React, { useState } from 'react';
 function ResultsComponent({ results }) {
   const [activeTab, setActiveTab] = useState('summary');
   
-  console.log("ResultsComponent received results:", results);
+  if (!results) return null;
   
-  if (!results) {
-    console.log("No results provided to ResultsComponent");
-    return null;
-  }
+  const { transcript, summary, audioFilePath } = results;
   
-  const { transcript, summary, videoFilePath, audioFilePath } = results;
-  
-  console.log("Extracted data from results:", {
-    hasTranscript: !!transcript,
-    transcriptLength: transcript?.length,
-    hasSummary: !!summary,
-    summaryLength: summary?.length,
-    audioPath: audioFilePath
-  });
-
-  // Ensure we have the required data
   if (!summary && !transcript) {
     return (
       <div className="alert alert-warning">
@@ -31,52 +17,44 @@ function ResultsComponent({ results }) {
   }
   
   return (
-    <div className="card bg-base-100 shadow-xl p-6 mt-8">
-      <h2 className="card-title text-2xl mb-6">Meeting Results</h2>
-      
-      {/* Tabs */}
-      <div role="tablist" className="tabs tabs-bordered">
-        <input type="radio" 
-               name="my_tabs_1" 
-               role="tab" 
-               className="tab" 
-               aria-label="Summary" 
-               checked={activeTab === 'summary'}
-               onChange={() => setActiveTab('summary')} />
-        <div role="tabpanel" className="tab-content p-4">
-          <div className="prose">
-            <h3 className="text-xl font-semibold mb-4">Meeting Summary</h3>
-            <pre className="whitespace-pre-wrap text-base font-normal">
-              {summary || 'No summary available'}
-            </pre>
-          </div>
-        </div>
-
-        <input type="radio" 
-               name="my_tabs_1" 
-               role="tab" 
-               className="tab" 
-               aria-label="Transcript"
-               checked={activeTab === 'transcript'}
-               onChange={() => setActiveTab('transcript')} />
-        <div role="tabpanel" className="tab-content p-4">
-          <div className="prose">
-            <h3 className="text-xl font-semibold mb-4">Full Transcript</h3>
-            <pre className="whitespace-pre-wrap text-base font-normal">
-              {transcript || 'No transcript available'}
-            </pre>
-          </div>
-        </div>
+    <div className="mt-8">
+      {/* Simple tabs at the top */}
+      <div className="tabs tabs-lifted">
+        <a className={`tab tab-lg ${activeTab === 'summary' ? 'tab-active' : ''}`}
+           onClick={() => setActiveTab('summary')}>
+          Summary
+        </a>
+        <a className={`tab tab-lg ${activeTab === 'transcript' ? 'tab-active' : ''}`}
+           onClick={() => setActiveTab('transcript')}>
+          Full Transcript
+        </a>
       </div>
-      
-      {/* File Info */}
-      <div className="mt-8 p-4 bg-base-200 rounded-lg">
-        <h3 className="font-semibold mb-2">Recording Files</h3>
-        {videoFilePath && <p className="text-sm">Video saved at: {videoFilePath}</p>}
+
+      {/* Content area with subtle background */}
+      <div className="bg-base-100 p-6 rounded-b-box border-base-300 border-x border-b min-h-[300px]">
+        {activeTab === 'summary' && (
+          <div className="prose max-w-none">
+            <h2 className="text-2xl font-bold mb-4">Meeting Summary</h2>
+            <div className="whitespace-pre-wrap bg-base-200 p-4 rounded-lg">
+              {summary}
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'transcript' && (
+          <div className="prose max-w-none">
+            <h2 className="text-2xl font-bold mb-4">Full Transcript</h2>
+            <div className="whitespace-pre-wrap bg-base-200 p-4 rounded-lg">
+              {transcript}
+            </div>
+          </div>
+        )}
+
+        {/* File info as a badge */}
         {audioFilePath && (
-          <div className="text-sm flex items-center gap-2">
-            <span className="font-medium">Audio:</span>
-            <span className="text-base-content/70">{audioFilePath}</span>
+          <div className="mt-6 flex items-center gap-2">
+            <div className="badge badge-neutral">Audio File</div>
+            <span className="text-sm opacity-70">{audioFilePath}</span>
           </div>
         )}
       </div>

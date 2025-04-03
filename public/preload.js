@@ -9,8 +9,9 @@ contextBridge.exposeInMainWorld(
     send: (channel, data) => {
       // Whitelist channels
       const validChannels = [
-        'start-recording', 
-        'stop-recording'
+        'start-recording',
+        'stop-recording',
+        'get-recordings'
       ];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
@@ -26,12 +27,13 @@ contextBridge.exposeInMainWorld(
         'transcribing-audio',
         'generating-summary',
         'processing-complete',
-        'processing-error'
+        'processing-error',
+        'recordings-updated'
       ];
       if (validChannels.includes(channel)) {
-        // Deliberately strip event as it includes `sender` 
+        // Deliberately strip event as it includes `sender`
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
     }
   }
-); 
+);
