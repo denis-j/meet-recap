@@ -10,7 +10,7 @@ const electron = window.electron;
 function App() {
   const [apiKey, setApiKey] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState('idle'); // idle, requesting_access, recording, processing, transcribing, summarizing, complete, error, viewing
   const [recordedChunks, setRecordedChunks] = useState([]);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [stream, setStream] = useState(null);
@@ -45,7 +45,7 @@ function App() {
     });
 
     electron.receive('processing-complete', (data) => {
-      setResults(data);
+      setResults(data); // Set results after processing
       setStatus('complete');
     });
 
@@ -56,9 +56,6 @@ function App() {
 
     // Cleanup on unmount
     return () => {
-      // Note: We can't remove listeners with the bridge API
-      // but the window will be destroyed anyway
-      
       // Stop any ongoing recording/stream
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -68,94 +65,63 @@ function App() {
 
   // Handle start recording
   const startRecording = async () => {
+    // Clear previous results/errors when starting a new recording
+    setResults(null);
+    setError(null);
+    setStatus('requesting_access');
+
     try {
-      setError(null);
-      setStatus('requesting_access');
-
-      // Set OpenAI API key
       const apiKeyToUse = apiKey;
-
-      console.log("Attempting to get audio stream using navigator.mediaDevices.getUserMedia...");
-
+      console.log("Attempting to get audio stream...");
       let audioStream;
       try {
-        // Request microphone access
-        audioStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false // Explicitly no video
-        });
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         console.log("Got audio stream successfully.");
       } catch (err) {
         console.error('Error getting audio stream:', err);
-        // Handle common errors
         let userMessage = `Error getting microphone access: ${err.message}.`;
-        if (err.name === 'NotAllowedError') {
-          userMessage += ' Please grant microphone permission in System Settings -> Privacy & Security -> Microphone.';
-        } else if (err.name === 'NotFoundError') {
-          userMessage += ' No microphone found.';
-        }
+        if (err.name === 'NotAllowedError') userMessage += ' Please grant microphone permission.';
+        else if (err.name === 'NotFoundError') userMessage += ' No microphone found.';
         setError(userMessage);
         setStatus('error');
-        return; // Stop execution
+        return;
       }
 
-      setStream(audioStream); // Store the audio-only stream
+      setStream(audioStream);
 
-      // Create MediaRecorder for audio
       let options = {};
       const supportedAudioTypes = [
-        'audio/webm;codecs=opus',
-        'audio/ogg;codecs=opus',
-        'audio/webm',
-        'audio/ogg',
-        'audio/mp4', // Less common for recording but possible
-        'audio/aac'
+        'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4', 'audio/aac'
       ];
-
       for (const type of supportedAudioTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           options = { mimeType: type };
-          break; // Use the first supported type
+          console.log("Using audio mimeType:", options.mimeType);
+          break;
         }
       }
-
-       if (!options.mimeType) {
-         console.warn('No specific audio mime type supported, using default.');
-         // Let the browser decide the default audio mimeType
-       } else {
-          console.log("Using audio mimeType:", options.mimeType);
-       }
-
-
+       if (!options.mimeType) console.warn('No specific audio mime type supported, using default.');
+       
       const recorder = new MediaRecorder(audioStream, options);
       setMediaRecorder(recorder);
 
-      // Event handler for dataavailable
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          setRecordedChunks(prev => [...prev, e.data]);
-        }
+        if (e.data.size > 0) setRecordedChunks(prev => [...prev, e.data]);
       };
 
-      // Start recording
       console.log("Starting audio recording...");
-      recorder.start(1000); // Collect chunks every second
+      recorder.start(1000);
       setIsRecording(true);
       setStatus('recording');
-      setError(null);
-
-      // Notify main process (sending API key is still useful)
       electron.send('start-recording', { apiKey: apiKeyToUse });
-
     } catch (err) {
-      // Catch any unexpected errors during the setup
       console.error('Unexpected error in startRecording:', err);
       setError(`Failed to start audio recording: ${err.message}`);
       setStatus('error');
     }
   };
 
-  // Handle stop recording - needs adjustment for audio mime type
+  // Handle stop recording
   const stopRecording = () => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
@@ -163,22 +129,16 @@ function App() {
 
       mediaRecorder.onstop = () => {
         if (stream) {
-          stream.getTracks().forEach(track => track.stop()); // Stop microphone
+          stream.getTracks().forEach(track => track.stop());
         }
-
-        // Determine the correct mime type for the Blob
-        const blobMimeType = mediaRecorder.mimeType || 'audio/webm'; // Fallback if mimeType isn't set
+        const blobMimeType = mediaRecorder.mimeType || 'audio/webm';
         console.log("Creating Blob with mimeType:", blobMimeType);
-
-        const blob = new Blob(recordedChunks, {
-          type: blobMimeType
-        });
+        const blob = new Blob(recordedChunks, { type: blobMimeType });
 
         blob.arrayBuffer().then(buffer => {
-          // Send the raw audio blob buffer and its mime type to the main process
-          electron.send('stop-recording', {
-              audioBuffer: new Uint8Array(buffer),
-              mimeType: blobMimeType // Send mime type for correct handling
+          electron.send('stop-recording', { 
+              audioBuffer: new Uint8Array(buffer), 
+              mimeType: blobMimeType 
           });
           setRecordedChunks([]);
         });
@@ -186,44 +146,51 @@ function App() {
     }
   };
 
+  // Handle selecting a recording from the sidebar
+  const handleSelectRecording = (recording) => {
+    console.log("App received selected recording:", recording);
+    setResults(recording);
+    setStatus('viewing');
+    setError(null);
+
+    const drawerCheckbox = document.getElementById('recordings-drawer');
+    if (drawerCheckbox) drawerCheckbox.checked = false;
+  };
+
   return (
     <div className="drawer lg:drawer-open">
       <input id="recordings-drawer" type="checkbox" className="drawer-toggle" />
-      
-      {/* Page content */}
       <div className="drawer-content flex flex-col">
-        {/* Drawer toggle button for mobile */}
-        <div className="w-full navbar bg-base-300 lg:hidden">
-          <label htmlFor="recordings-drawer" className="btn btn-square btn-ghost">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-6 h-6 stroke-current">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-          </label>
+        <div className="navbar bg-base-100 shadow-sm lg:hidden sticky top-0 z-10">
+          <div className="flex-none">
+            <label htmlFor="recordings-drawer" className="btn btn-square btn-ghost">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="inline-block w-5 h-5 stroke-current"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </label>
+          </div>
           <div className="flex-1">
-            <span className="text-xl font-bold">Meet Recap</span>
+            <span className="btn btn-ghost text-xl normal-case">Meet Recap</span>
           </div>
         </div>
 
-        {/* Main content */}
-        <div className="p-4 md:p-8">
+        <div className="p-4 md:p-8 flex-grow">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-6 text-center text-primary hidden lg:block">Meet Recap</h1>
 
-            {/* Conditional rendering for API Key Form or Recording Area */} 
             {!apiKey ? (
               <ApiKeyForm setApiKey={setApiKey} />
             ) : (
               <>
-                <RecordingComponent 
-                  isRecording={isRecording}
-                  startRecording={startRecording}
-                  stopRecording={stopRecording}
-                  status={status}
-                  stream={stream}
-                />
+                {status !== 'viewing' && (
+                  <RecordingComponent 
+                    isRecording={isRecording}
+                    startRecording={startRecording}
+                    stopRecording={stopRecording}
+                    status={status}
+                    stream={stream}
+                  />
+                )}
                 
-                {/* Button to clear API key */} 
-                <div className="mt-4 flex items-center justify-center gap-2 text-sm text-base-content/70">
+                <div className="mt-4 flex items-center justify-center gap-4 text-sm text-base-content/70">
                   <span>API key is set.</span>
                   <button 
                     className="btn btn-xs btn-ghost"
@@ -231,43 +198,42 @@ function App() {
                   >
                     Clear API Key
                   </button>
+                  {status === 'viewing' && (
+                     <button 
+                      className="btn btn-xs btn-outline btn-primary"
+                      onClick={() => {
+                        setResults(null);
+                        setStatus('idle');
+                      }}
+                    >
+                      New Recording
+                    </button>
+                  )}
                 </div>
+
+                {status === 'processing' && <div className="alert alert-info mt-4">Processing recording...</div>}
+                {status === 'transcribing' && <div className="alert alert-info mt-4">Transcribing audio...</div>}
+                {status === 'summarizing' && <div className="alert alert-info mt-4">Generating summary...</div>}
+
+                {(status === 'complete' || status === 'viewing') && results && (
+                  <ResultsComponent results={results} isViewing={status === 'viewing'} />
+                )}
+
+                {status === 'error' && error && (
+                  <div role="alert" className="alert alert-error mt-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2 2m2-2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>{error}</span>
+                  </div>
+                )}
               </>
-            )}
-
-            {/* Status messages */}
-            {status === 'processing' && (
-              <div className="alert alert-info mt-4">Processing recording...</div>
-            )}
-            {status === 'transcribing' && (
-              <div className="alert alert-info mt-4">Transcribing audio...</div>
-            )}
-            {status === 'summarizing' && (
-              <div className="alert alert-info mt-4">Generating summary...</div>
-            )}
-
-            {/* Results Component */}
-            {status === 'complete' && results && (
-              <ResultsComponent results={results} />
-            )}
-
-            {/* Error Alert */}
-            {error && (
-              <div role="alert" className="alert alert-error mt-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
-              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Sidebar */}
-      <Sidebar />
+      <Sidebar onSelectRecording={handleSelectRecording} />
     </div>
   );
 }
 
-export default App; 
+export default App;

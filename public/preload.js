@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld(
       const validChannels = [
         'start-recording',
         'stop-recording',
-        'get-recordings'
+        'get-recordings',
+        'update-meeting-details'
       ];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);

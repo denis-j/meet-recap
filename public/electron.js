@@ -10,24 +10,92 @@ let mainWindow;
 // Store API key
 let openaiApiKey = '';
 
+// Simplified function to return a static default display name
+function formatDefaultDisplayName(name) {
+  // No longer parses the name, just returns a default string
+  return "Meeting"; 
+}
+
 // Function to get all recordings from the music directory
 function getRecordings() {
   const musicDir = app.getPath('music');
-  const files = fs.readdirSync(musicDir)
-    .filter(file => file.startsWith('meeting_') && file.endsWith('.webm'))
-    .map(file => {
-      const filePath = path.join(musicDir, file);
-      const stats = fs.statSync(filePath);
-      return {
-        name: file,
-        path: filePath,
-        date: stats.mtime.toLocaleString(),
-        size: (stats.size / (1024 * 1024)).toFixed(2) + ' MB'
-      };
-    })
-    .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date, newest first
+  try {
+    const filesData = fs.readdirSync(musicDir) 
+      .filter(file => file.startsWith('meeting_') && file.endsWith('.json'))
+      .map(file => {
+        const filePath = path.join(musicDir, file);
+        let summary = 'Summary not available.'; 
+        let transcript = 'Transcript not available.';
+        let audioFilePath = 'Audio file path not available.';
+        let fileSize = 'N/A';
+        let fileDateStr = 'N/A'; // String for display
+        let fileTimestamp = 0; // Timestamp for sorting
+        let displayName = formatDefaultDisplayName(file); 
+        let tags = []; 
+        let recordingTimestampFromJson = null; // Store timestamp from JSON if available
 
-  return files;
+        try {
+          // First, try reading the JSON to get the original timestamp
+          const jsonData = fs.readFileSync(filePath, 'utf-8');
+          const parsedData = JSON.parse(jsonData);
+          summary = parsedData.summary || summary;
+          transcript = parsedData.transcript || transcript;
+          audioFilePath = parsedData.audioFilePath || audioFilePath;
+          displayName = parsedData.displayName || displayName; 
+          tags = parsedData.tags || tags;
+          // *** READ original timestamp from JSON ***
+          recordingTimestampFromJson = parsedData.recordingTimestamp || null;
+
+          // Get file stats for size and fallback date/timestamp
+          const stats = fs.statSync(filePath);
+          fileSize = (stats.size / 1024).toFixed(2) + ' KB'; 
+
+          // *** Use JSON timestamp if available, otherwise use file mtime ***
+          if (recordingTimestampFromJson && !isNaN(recordingTimestampFromJson)) {
+              fileTimestamp = recordingTimestampFromJson;
+              fileDateStr = new Date(recordingTimestampFromJson).toLocaleString();
+          } else {
+              // Fallback for older files without the timestamp
+              fileTimestamp = stats.mtime.getTime(); 
+              fileDateStr = stats.mtime.toLocaleString(); 
+              console.warn(`File ${filePath} missing recordingTimestamp, using mtime as fallback.`);
+          }
+
+        } catch (readError) {
+          console.error(`Error reading or parsing file ${filePath}:`, readError);
+          // If JSON reading fails completely, try getting basic file stats as fallback
+          try {
+            const stats = fs.statSync(filePath);
+            fileTimestamp = stats.mtime.getTime();
+            fileDateStr = stats.mtime.toLocaleString();
+            fileSize = (stats.size / 1024).toFixed(2) + ' KB';
+          } catch (statError) {
+              console.error(`Could not get stats for file ${filePath}:`, statError);
+          }
+        }
+
+        return {
+          jsonPath: filePath, 
+          displayName: displayName, 
+          date: fileDateStr, // Use date derived from original timestamp (or mtime fallback)
+          timestamp: fileTimestamp, // Use original timestamp for sorting (or mtime fallback)
+          size: fileSize, 
+          tags: tags, 
+          summary: summary,
+          transcript: transcript,
+          audioFilePath: audioFilePath,
+          // Include the original timestamp itself if needed elsewhere
+          recordingTimestamp: recordingTimestampFromJson 
+        };
+      });
+      
+      filesData.sort((a, b) => b.timestamp - a.timestamp); 
+
+    return filesData;
+  } catch (dirError) {
+    console.error(`Error reading directory ${musicDir}:`, dirError);
+    return []; 
+  }
 }
 
 // Function to update recordings list in renderer
@@ -244,22 +312,44 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
       console.log("Raw summary response:", JSON.stringify(summary, null, 2));
       console.log("Summary content:", summary.choices[0].message.content);
 
-      // Send the results back to the renderer
-      const resultsToSend = {
+      // *** Get the timestamp from when recording *stopped* ***
+      const recordingTimestamp = now.getTime(); // Use the 'now' Date object already defined
+
+      // Prepare results object - ADD recordingTimestamp
+      const defaultDisplayName = formatDefaultDisplayName(`meeting_${dateStr}`); 
+      const resultsToSave = {
+        recordingTimestamp: recordingTimestamp, // *** ADD timestamp ***
+        displayName: defaultDisplayName, 
+        tags: [], 
         transcript: transcription.text,
         summary: summary.choices[0].message.content,
-        audioFilePath,
-        videoFilePath: null
+        audioFilePath, 
       };
-      
-      console.log("Sending results to renderer. Summary length:", resultsToSend.summary.length);
-      event.reply('processing-complete', resultsToSend);
 
-    } catch (error) {
-      console.error('Error processing audio recording:', error);
-      // Clean up the saved file if processing fails?
-      // fs.unlinkSync(audioFilePath); // Optional: Delete file on error
-      event.reply('processing-error', error.message);
+      // --- Save results to JSON --- 
+      try {
+        // Generate JSON file path based on the *audio* file path chosen by user
+        const jsonFilePath = audioFilePath.replace(/\.[^/.]+$/, '.json'); 
+        const jsonData = JSON.stringify(resultsToSave, null, 2); 
+        fs.writeFileSync(jsonFilePath, jsonData);
+        console.log(`Results saved to: ${jsonFilePath}`);
+        updateRecordingsList(); 
+      } catch (jsonError) {
+        console.error('Error saving results JSON:', jsonError);
+      }
+      // --- End Save results to JSON ---
+      
+      // Send results back to renderer (include the timestamp)
+      console.log("Sending results to renderer:", resultsToSave);
+      event.reply('processing-complete', resultsToSave);
+
+    } catch (processingError) { // Catch errors specific to transcription/summary
+      console.error('Error during transcription or summary:', processingError);
+      event.reply('processing-error', `Error during processing: ${processingError.message}`);
+      // Note: The audio file is already saved at this point.
+      // You might want to send partial results or just the error.
+      // Example: event.reply('processing-complete', { transcript: null, summary: null, audioFilePath }); 
+      // Or just let the error reply handle it.
     }
 
   } catch (error) {
@@ -271,4 +361,46 @@ ipcMain.on('stop-recording', async (event, data) => { // data contains audioBuff
 // Add new IPC handlers for recordings
 ipcMain.on('get-recordings', () => {
   updateRecordingsList();
+});
+
+// *** NEW: Handler to update meeting details ***
+ipcMain.on('update-meeting-details', (event, { jsonPath, displayName, tags }) => {
+  console.log('Received update-meeting-details:', { jsonPath, displayName, tags });
+  try {
+    if (!jsonPath || typeof jsonPath !== 'string') {
+      throw new Error('Invalid or missing jsonPath for update.');
+    }
+
+    // *** Read current stats BEFORE potential modification ***
+    let needsTimestampBackfill = false;
+    let timestampToBackfill = 0;
+    const stats = fs.statSync(jsonPath); // Get stats regardless
+
+    // Read the existing file content
+    const jsonData = fs.readFileSync(jsonPath, 'utf-8');
+    const meetingData = JSON.parse(jsonData);
+
+    // *** Check if timestamp is missing and needs backfilling ***
+    if (!meetingData.recordingTimestamp || isNaN(meetingData.recordingTimestamp)) {
+        needsTimestampBackfill = true;
+        timestampToBackfill = stats.mtime.getTime(); // Use mtime from BEFORE update
+        console.log(`File ${jsonPath} is missing recordingTimestamp. Will backfill with mtime: ${new Date(timestampToBackfill).toISOString()}`);
+        meetingData.recordingTimestamp = timestampToBackfill; // Add it to the object
+    }
+
+    // Update the display name and tags
+    meetingData.displayName = displayName; 
+    meetingData.tags = tags; 
+
+    // Write the updated data back to the file
+    // This will update mtime, but we've already captured the old one if needed
+    fs.writeFileSync(jsonPath, JSON.stringify(meetingData, null, 2));
+    console.log(`Updated meeting details in: ${jsonPath}${needsTimestampBackfill ? ' (and backfilled timestamp)' : ''}`);
+
+    // Refresh the sidebar list
+    updateRecordingsList();
+
+  } catch (error) {
+    console.error('Error updating meeting details:', error);
+  }
 }); 
