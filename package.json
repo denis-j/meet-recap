@@ -9,7 +9,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron-dev": "electron .",
-    "electron": "wait-on http://localhost:3000 && electron .",
+    "electron": "wait-on http://localhost:3000 && npx electron .",
     "dev": "concurrently \"npm start\" \"npm run electron\"",
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
