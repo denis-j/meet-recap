@@ -217,8 +217,7 @@ function ResultsComponent({ results, isViewing }) {
              {/* Audio File Path */} 
               {audioFilePath && (
                 <div className="pt-4 border-t border-base-300/50 mt-6 flex items-center gap-2 text-xs text-base-content/70">
-                  <div className="badge badge-outline rounded-full">Audio File</div>
-                  <span className="opacity-70 break-all" title={audioFilePath}>{audioFilePath}</span>
+                  <span className="opacity-70 break-all" title={audioFilePath}>Audio file: {audioFilePath}</span>
                 </div>
               )}
            </div>
