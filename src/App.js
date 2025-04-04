@@ -227,22 +227,19 @@ function App() {
         </div>
 
         <div className="p-4 md:p-8 flex-grow">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6 text-center text-primary hidden lg:block">Meet Recap</h1>
-
-            {/* Show loading or form/app based on apiKey state */}
+          <div className="">
+            {/* Conditional Rendering for Main Content */} 
             {apiKey === null ? (
-              // Optional: Show a loading indicator while checking for stored key
               <div className="text-center p-10">
                   <span className="loading loading-ring loading-lg"></span>
               </div>
             ) : !apiKey ? (
-              // If apiKey is explicitly empty string, show the form
-              <ApiKeyForm setApiKey={setApiKey} /> // Pass setApiKey so the form can update it
+              <ApiKeyForm setApiKey={setApiKey} />
             ) : (
-              // If apiKey has a value, show the main app content
+              // Main application content when API key is set
               <>
-                {status !== 'viewing' && (
+                {/* Show Recording Component if not viewing results */}
+                {(status !== 'complete' && status !== 'viewing') && (
                   <RecordingComponent 
                     isRecording={isRecording}
                     startRecording={startRecording}
@@ -252,47 +249,31 @@ function App() {
                   />
                 )}
                 
-                {/* Button to clear API key - Now calls handleClearApiKey */}
-                <div className="mt-4 flex items-center justify-center gap-4 text-sm text-base-content/70">
-                   <span>API key is set.</span>
-                   <button 
-                     className="btn btn-xs btn-ghost"
-                     onClick={handleClearApiKey} // Use the new handler
-                   >
-                     Clear API Key
-                   </button>
-                   {status === 'viewing' && (
-                      <button 
-                       className="btn btn-xs btn-outline btn-primary"
-                       onClick={() => {
-                         setResults(null); 
-                         setStatus('idle');  
-                       }}
-                     >
-                       New Recording
-                     </button>
-                   )}
-                </div>
+                {/* Status Indicators */} 
+                {status === 'processing' && <div className="alert alert-info mt-4 shadow-md">Processing recording... <span className="loading loading-dots loading-sm"></span></div>}
+                {status === 'transcribing' && <div className="alert alert-info mt-4 shadow-md">Transcribing audio... <span className="loading loading-dots loading-sm"></span></div>}
+                {status === 'summarizing' && <div className="alert alert-info mt-4 shadow-md">Generating summary... <span className="loading loading-dots loading-sm"></span></div>}
 
-                {status === 'processing' && <div className="alert alert-info mt-4">Processing recording...</div>}
-                {status === 'transcribing' && <div className="alert alert-info mt-4">Transcribing audio...</div>}
-                {status === 'summarizing' && <div className="alert alert-info mt-4">Generating summary...</div>}
-
+                {/* Results Component */} 
                 {(status === 'complete' || status === 'viewing') && results && (
-                  <ResultsComponent results={results} isViewing={status === 'viewing'} />
+                  // Removed the margin-top here, handle spacing inside ResultsComponent now
+                  <div className="">
+                    <ResultsComponent results={results} isViewing={status === 'viewing'} />
+                  </div>
                 )}
 
+                {/* Error Display */} 
                 {status === 'error' && error && (
-                   <div role="alert" className="alert alert-error mt-4">
+                   <div role="alert" className="alert alert-error mt-4 shadow-md">
                      <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2 2m2-2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                      <span>{error}</span>
                    </div>
                  )}
-              </> 
-            )} 
-          </div> 
-        </div> 
-      </div> 
+              </>
+            )}
+          </div>
+        </div>
+      </div>
       <Sidebar onSelectRecording={handleSelectRecording} onStartMeeting={startRecording} />
     </div>
   );

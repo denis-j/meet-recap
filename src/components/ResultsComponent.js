@@ -17,20 +17,22 @@ function ResultsComponent({ results, isViewing }) {
   const [editTags, setEditTags] = useState([]);
   const [newTagInput, setNewTagInput] = useState('');
 
-  // Update edit state when results change (e.g., selecting a different recording)
   useEffect(() => {
     if (results) {
-      setEditName(results.displayName || ''); // Use displayName
+      setEditName(results.displayName || 'Meeting'); // Default to 'Meeting' if no displayName
       setEditTags(results.tags || []);
-      setIsEditing(false); // Reset edit mode when result changes
-      setActiveTab('summary'); // Reset to summary tab
+      setIsEditing(false);
+      setActiveTab('summary');
     }
   }, [results]);
 
   if (!results) return null;
   
-  const { transcript, summary, audioFilePath, displayName, tags = [], jsonPath } = results;
-  
+  const { transcript, summary, audioFilePath, date, jsonPath } = results; // Get date from results
+  const currentDisplayName = editName || results.displayName || 'Meeting'; // Consistent display name
+  const currentTags = isEditing ? editTags : (results.tags || []); // Show editTags or results.tags
+
+  // Check if there is content to display
   if (!summary && !transcript) {
     return (
       <div className="alert alert-warning">
@@ -71,109 +73,142 @@ function ResultsComponent({ results, isViewing }) {
   };
 
   return (
-    <div className="mt-8 card bg-base-100 shadow-xl" data-theme="cupcake">
-      <div className="card-body p-0">
-        <div className="p-6 pb-0">
-          <div className="flex justify-between items-center mb-4">
-             {isEditing ? (
-                <input 
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="input input-bordered input-lg w-full max-w-md"
-                />
-             ) : (
-               <h2 className="text-2xl font-bold card-title truncate">{editName || displayName}</h2>
-             )}
-            {isViewing && (
-              <div className="flex gap-2">
-                {isEditing ? (
-                  <>
-                    <button className="btn btn-sm btn-ghost" onClick={() => setIsEditing(false)}>Cancel</button>
-                    <button className="btn btn-sm btn-primary" onClick={handleSaveEdit}>Save</button>
-                  </>
-                ) : (
-                  <button className="btn btn-sm btn-outline" onClick={() => setIsEditing(true)}>Edit</button>
-                )}
-              </div>
-            )}
-          </div>
-
+    <div className="space-y-6">
+      {/* --- Header Card --- */}
+      <div className="p-5 sm:p-6 rounded-lg bg-base-200 shadow-lg">
+        {/* Top Row: Title + Edit Button */}
+        <div className="flex justify-between items-start mb-4">
+          {isEditing ? (
+            <input 
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="input input-bordered input-lg w-full max-w-md rounded-lg"
+              placeholder="Meeting Name"
+            />
+           ) : (
+             <h1 className="text-2xl font-bold truncate" title={currentDisplayName}>{currentDisplayName}</h1>
+           )}
            {isViewing && (
-             <div className="mb-4">
+             <div className="flex gap-2 flex-shrink-0 ml-4">
                {isEditing ? (
-                 <div className="p-4 border border-base-300 rounded-lg bg-base-200">
-                   <h4 className="font-semibold mb-2 text-sm">Edit Tags</h4>
+                 <>
+                   <button className="btn btn-sm btn-ghost rounded-lg" onClick={() => setIsEditing(false)}>Cancel</button>
+                   <button className="btn btn-sm btn-primary rounded-lg" onClick={handleSaveEdit}>Save</button>
+                 </>
+               ) : (
+                 <button className="btn btn-sm btn-outline rounded-lg" onClick={() => setIsEditing(true)}>Edit</button>
+               )}
+             </div>
+           )}
+         </div>
+
+        {/* Middle Row: Date Info */}
+         {date && (
+           <div className="flex items-center gap-2 text-sm opacity-70 mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span>{date}</span> 
+            </div>
+         )}
+
+        {/* Bottom Row: Tags */}
+          {isViewing && (
+             <div>
+               {isEditing ? (
+                 <div className="p-3 border border-base-300 rounded-lg bg-base-100">
+                    <h4 className="font-semibold mb-2 text-xs uppercase tracking-wide">Edit Tags</h4>
                     <div className="flex flex-wrap gap-2 mb-3">
                         {editTags.map(tag => (
-                            <div key={tag} className={`badge ${getTagColor(tag)} badge-lg gap-1`}>
+                            <div key={tag} className={`badge ${getTagColor(tag)} gap-1 rounded-full px-2.5 py-1 text-xs`}> 
                                 {tag}
-                                <button onClick={() => handleRemoveTag(tag)} className="btn btn-xs btn-circle btn-ghost ml-1">✕</button>
+                                <button onClick={() => handleRemoveTag(tag)} className="btn btn-xs btn-circle btn-ghost ml-0.5">✕</button>
                             </div>
                         ))}
-                        {editTags.length === 0 && <span className="text-xs text-base-content/60">No tags yet.</span>}
+                        {editTags.length === 0 && <span className="text-xs text-base-content/60 italic">No tags added yet.</span>}
                     </div>
                     <form onSubmit={handleAddTag} className="join">
                       <input 
                         type="text"
                         value={newTagInput}
                         onChange={(e) => setNewTagInput(e.target.value)}
-                        placeholder="Add a tag..."
-                        className="input input-bordered input-sm join-item"
+                        placeholder="New tag..."
+                        className="input input-bordered input-xs join-item w-24 rounded-l-lg"
                       />
-                      <button type="submit" className="btn btn-sm join-item">Add</button>
+                      <button type="submit" className="btn btn-xs join-item rounded-r-lg">Add</button>
                     </form>
                  </div>
                ) : (
-                 tags && tags.length > 0 && (
-                   <div className="flex flex-wrap gap-2">
-                     {tags.map(tag => (
-                         <div key={tag} className={`badge ${getTagColor(tag)}`}>{tag}</div>
-                     ))}
-                   </div>
-                 )
+                 <div className="flex flex-wrap items-center gap-2">
+                   {currentTags.map(tag => (
+                       <div key={tag} className={`badge ${getTagColor(tag)} rounded-full px-2.5 py-1 text-xs`}>{tag}</div>
+                   ))}
+                   <button 
+                     onClick={() => setIsEditing(true)}
+                     className="btn btn-xs btn-ghost btn-circle rounded-full" 
+                     title="Edit Tags"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                   </button>
+                   {currentTags.length === 0 && (
+                     <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost opacity-60 rounded-lg">
+                       + Add label
+                     </button>
+                   )}
+                 </div>
                )}
              </div>
            )}
-        </div>
+       </div>
+      
+       {/* --- Main Content Card --- */}
+      <div className="bg-base-200 p-5 sm:p-6 rounded-lg shadow-lg">
+          {/* Tabs - Using default style now */} 
+          <div className="tabs mb-6 bg-base-300 rounded-lg w-56">
+             <a 
+               className={`tab tab-bordered ${activeTab === 'summary' ? 'tab-active' : ''}`} 
+               onClick={() => setActiveTab('summary')}
+             >
+               Meeting Notes
+             </a> 
+             <a 
+               className={`tab tab-bordered ${activeTab === 'transcript' ? 'tab-active' : ''}`} 
+               onClick={() => setActiveTab('transcript')}
+             >
+               Transcript
+             </a> 
+           </div>
 
-        <div className="tabs tabs-lifted px-6 -mb-px">
-          <a className={`tab tab-lg ${activeTab === 'summary' ? 'tab-active [--tab-bg:hsl(var(--b1))] [--tab-border-color:hsl(var(--b1))] ' : ''}`}
-             onClick={() => setActiveTab('summary')}>
-            Summary
-          </a>
-          <a className={`tab tab-lg ${activeTab === 'transcript' ? 'tab-active [--tab-bg:hsl(var(--b1))] [--tab-border-color:hsl(var(--b1))] ' : ''}`}
-             onClick={() => setActiveTab('transcript')}>
-            Full Transcript
-          </a>
-          <a className="tab tab-lg flex-grow"></a>
-        </div>
+          {/* Tab Content */} 
+          <div className="space-y-4">
+             {activeTab === 'summary' && (
+               <div className="prose max-w-none prose-sm lg:prose-base">
+                 <h3 className="font-semibold mb-2">Executive Summary</h3> 
+                 {/* Simple text display, prose handles styling */} 
+                 <p className="text-base-content/90">
+                   {summary || "Summary not available."} 
+                 </p>
+               </div>
+             )}
+             
+             {activeTab === 'transcript' && (
+               <div className="prose max-w-none prose-sm lg:prose-base">
+                 <h3 className="font-semibold mb-2">Full Transcript</h3> 
+                 {/* Simple text display, prose handles styling */} 
+                 <p className="text-base-content/90 whitespace-pre-wrap"> {/* Keep whitespace for transcript */} 
+                    {transcript || "Transcript not available."} 
+                  </p>
+               </div>
+             )}
 
-        <div className="bg-base-100 p-6 rounded-b-box border-base-300 border-t min-h-[300px]">
-          {activeTab === 'summary' && (
-            <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap bg-base-200 p-4 rounded-lg">
-                {summary}
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'transcript' && (
-            <div className="prose max-w-none">
-              <div className="whitespace-pre-wrap bg-base-200 p-4 rounded-lg">
-                {transcript}
-              </div>
-            </div>
-          )}
-
-          {audioFilePath && (
-            <div className="mt-6 flex items-center gap-2">
-              <div className="badge badge-neutral">Audio File</div>
-              <span className="text-sm opacity-70 break-all">{audioFilePath}</span>
-            </div>
-          )}
-        </div>
-      </div>
+             {/* Audio File Path */} 
+              {audioFilePath && (
+                <div className="pt-4 border-t border-base-300/50 mt-6 flex items-center gap-2 text-xs text-base-content/70">
+                  <div className="badge badge-outline rounded-full">Audio File</div>
+                  <span className="opacity-70 break-all" title={audioFilePath}>{audioFilePath}</span>
+                </div>
+              )}
+           </div>
+       </div>
     </div>
   );
 }
