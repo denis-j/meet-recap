@@ -146,8 +146,9 @@ function updateRecordingsList() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 680,
+    width: 1300,
+    height: 700,
+    resizable: false,
     webPreferences: {
       nodeIntegration: false, // For security
       contextIsolation: true, // Protect against prototype pollution
@@ -530,8 +531,8 @@ function createMiniWindow() {
     return;
   }
   miniWindow = new BrowserWindow({
-    width: 250, // Adjust size as needed
-    height: 60, // Adjust size as needed
+    width: 100, // Adjust size as needed default 250!
+    height: 53, // Adjust size as needed default 60!
     frame: false, // No window frame (title bar, etc.)
     resizable: false,
     alwaysOnTop: true, // Keep it above other windows

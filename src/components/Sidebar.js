@@ -62,7 +62,12 @@ function Sidebar({ onSelectRecording }) {
     <div className="drawer-side border-r border-base-300">
       <label htmlFor="recordings-drawer" className="drawer-overlay"></label>
       <aside className="bg-base-200 w-64 min-h-full p-4 flex flex-col">
-        <h3 className="font-bold text-lg mb-4">Recent Recordings</h3>
+        <div className="flex items-center mb-4">
+          <h3 className="font-bold text-lg text-left">Meetings</h3>
+          <div className="ml-auto">
+            <button className="btn btn-primary btn-sm">Start Meeting</button>
+          </div>
+        </div>
         
         {/* Search Input */} 
         <div className="mb-4 relative">
