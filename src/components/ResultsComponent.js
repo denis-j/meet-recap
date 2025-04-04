@@ -76,89 +76,103 @@ function ResultsComponent({ results, isViewing }) {
     <div className="space-y-6">
       {/* --- Header Card --- */}
       <div className="p-5 sm:p-6 rounded-lg bg-base-200 shadow-lg">
-        {/* Top Row: Title + Edit Button */}
-        <div className="flex justify-between items-start mb-4">
-          {isEditing ? (
-            <input 
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="input input-bordered input-lg w-full max-w-md rounded-lg"
-              placeholder="Meeting Name"
-            />
-           ) : (
-             <h1 className="text-2xl font-bold truncate" title={currentDisplayName}>{currentDisplayName}</h1>
-           )}
-           {isViewing && (
-             <div className="flex gap-2 flex-shrink-0 ml-4">
-               {isEditing ? (
-                 <>
-                   <button className="btn btn-sm btn-ghost rounded-lg" onClick={() => setIsEditing(false)}>Cancel</button>
-                   <button className="btn btn-sm btn-primary rounded-lg" onClick={handleSaveEdit}>Save</button>
-                 </>
-               ) : (
-                 <button className="btn btn-sm btn-outline rounded-lg" onClick={() => setIsEditing(true)}>Edit</button>
-               )}
-             </div>
-           )}
-         </div>
-
-        {/* Middle Row: Date Info */}
-         {date && (
-           <div className="flex items-center gap-2 text-sm opacity-70 mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <span>{date}</span> 
+        {isEditing ? (
+          /* --- EDITING VIEW --- */
+          <div className="space-y-4">
+            {/* Edit Title */}
+            <div>
+              <label htmlFor="edit-title" className="block text-sm font-medium text-base-content/80 mb-1">Meeting Title</label>
+              <input 
+                id="edit-title"
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="input input-bordered w-full rounded-lg"
+                placeholder="Enter meeting title..."
+              />
             </div>
-         )}
 
-        {/* Bottom Row: Tags */}
-          {isViewing && (
-             <div>
-               {isEditing ? (
-                 <div className="p-3 border border-base-300 rounded-lg bg-base-100">
-                    <h4 className="font-semibold mb-2 text-xs uppercase tracking-wide">Edit Tags</h4>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                        {editTags.map(tag => (
-                            <div key={tag} className={`badge ${getTagColor(tag)} gap-1 rounded-full px-2.5 py-1 text-xs`}> 
-                                {tag}
-                                <button onClick={() => handleRemoveTag(tag)} className="btn btn-xs btn-circle btn-ghost ml-0.5">✕</button>
-                            </div>
-                        ))}
-                        {editTags.length === 0 && <span className="text-xs text-base-content/60 italic">No tags added yet.</span>}
-                    </div>
-                    <form onSubmit={handleAddTag} className="join">
-                      <input 
-                        type="text"
-                        value={newTagInput}
-                        onChange={(e) => setNewTagInput(e.target.value)}
-                        placeholder="New tag..."
-                        className="input input-bordered input-xs join-item w-24 rounded-l-lg"
-                      />
-                      <button type="submit" className="btn btn-xs join-item rounded-r-lg">Add</button>
-                    </form>
-                 </div>
-               ) : (
-                 <div className="flex flex-wrap items-center gap-2">
-                   {currentTags.map(tag => (
-                       <div key={tag} className={`badge ${getTagColor(tag)} rounded-full px-2.5 py-1 text-xs`}>{tag}</div>
-                   ))}
-                   <button 
-                     onClick={() => setIsEditing(true)}
-                     className="btn btn-xs btn-ghost btn-circle rounded-full" 
-                     title="Edit Tags"
-                   >
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                   </button>
-                   {currentTags.length === 0 && (
-                     <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost opacity-60 rounded-lg">
-                       + Add label
-                     </button>
-                   )}
-                 </div>
-               )}
+            {/* Edit Tags */}
+            <div>
+              <label className="block text-sm font-medium text-base-content/80 mb-1">Tags</label>
+              <div className="p-3 border border-base-300 rounded-lg bg-base-100 space-y-3">
+                {/* Display current tags for removal */}
+                <div className="flex flex-wrap gap-2 min-h-[2rem]"> {/* Ensure some height even if empty */} 
+                  {editTags.map(tag => (
+                      <div key={tag} className={`badge ${getTagColor(tag)} gap-1 rounded-full px-2.5 py-1 text-xs`}> 
+                          {tag}
+                          <button onClick={() => handleRemoveTag(tag)} className="btn btn-xs btn-circle btn-ghost ml-0.5">✕</button>
+                      </div>
+                  ))}
+                  {editTags.length === 0 && <span className="text-xs text-base-content/60 italic self-center">No tags added yet.</span>}
+                </div>
+                {/* Form to add new tags - Adjusted size, spacing, rounding */}
+                <form onSubmit={handleAddTag} className="flex items-center mt-3"> {/* Use flex, remove join */} 
+                  <input 
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    placeholder="Add a new tag..."
+                    // Use input-sm, make it grow, ensure rounding
+                    className="input input-bordered input-sm grow rounded-lg"
+                  />
+                  {/* Use btn-sm, add margin-left, ensure rounding */}
+                  <button type="submit" className="btn btn-sm btn-primary ml-2 rounded-lg">Add Tag</button>
+                </form>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-2">
+               <button className="btn btn-sm btn-ghost rounded-lg" onClick={() => setIsEditing(false)}>Cancel</button>
+               <button className="btn btn-sm btn-primary rounded-lg" onClick={handleSaveEdit}>Save Changes</button>
              </div>
-           )}
-       </div>
+          </div>
+          /* --- END EDITING VIEW --- */
+
+        ) : (
+          /* --- DISPLAY VIEW --- */
+          <div> { /* Wrap display view in a div */}
+            {/* Top Row: Title + Edit Button */}
+            <div className="flex justify-between items-start mb-4">
+              <h1 className="text-2xl font-bold truncate" title={currentDisplayName}>{currentDisplayName}</h1>
+              {isViewing && (
+                <button className="btn btn-sm btn-outline rounded-lg flex-shrink-0 ml-4" onClick={() => setIsEditing(true)}>Edit</button>
+              )}
+            </div>
+
+            {/* Middle Row: Date Info */} 
+            {date && (
+              <div className="flex items-center gap-2 text-sm opacity-70 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <span>{date}</span> 
+                </div>
+            )}
+
+            {/* Bottom Row: Tags */}
+            {isViewing && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {currentTags.map(tag => (
+                      <div key={tag} className={`badge ${getTagColor(tag)} rounded-full px-2.5 py-1 text-xs`}>{tag}</div>
+                  ))}
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="btn btn-xs btn-ghost btn-circle rounded-full" 
+                    title="Edit Tags"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                  </button>
+                  {currentTags.length === 0 && (
+                    <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost opacity-60 rounded-lg">
+                      + Add label
+                    </button>
+                  )}
+                </div>
+            )}
+          </div>
+          /* --- END DISPLAY VIEW --- */
+        )}
+       </div> 
       
        {/* --- Main Content Card --- */}
       <div className="bg-base-200 p-5 sm:p-6 rounded-lg shadow-lg">
