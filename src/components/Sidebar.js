@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ListCard from './list';
+
 
 // Accept a function to handle selection
 function Sidebar({ onSelectRecording }) {
   const [recordings, setRecordings] = useState([]);
   const [searchTerm, setSearchTerm] = useState(''); // State for search input
+  const searchInputRef = useRef(null); // Create a ref for the input field
 
   useEffect(() => {
     window.electron.receive('recordings-updated', (files) => {
@@ -11,7 +14,24 @@ function Sidebar({ onSelectRecording }) {
       setRecordings(files);
     });
     window.electron.send('get-recordings');
-  }, []);
+
+    // --- Add Keydown Listener for Cmd/Ctrl + K ---
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault(); // Prevent default browser behavior (e.g., Chrome search)
+        searchInputRef.current?.focus(); // Focus the input field using the ref
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup function to remove the listener when the component unmounts
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+    // --- End Keydown Listener ---
+
+  }, []); // Empty dependency array ensures this runs only on mount and unmount
 
   const handleSelect = (recording) => {
     if (onSelectRecording) {
@@ -39,57 +59,39 @@ function Sidebar({ onSelectRecording }) {
   }
 
   return (
-    <div className="drawer-side">
+    <div className="drawer-side border-r border-base-300">
       <label htmlFor="recordings-drawer" className="drawer-overlay"></label>
-      <aside className="bg-base-200 w-80 min-h-full p-4 flex flex-col">
+      <aside className="bg-base-200 w-64 min-h-full p-4 flex flex-col">
         <h3 className="font-bold text-lg mb-4">Recent Recordings</h3>
         
-        {/* Search Input */}
+        {/* Search Input */} 
         <div className="mb-4 relative">
-          <input 
-            type="text"
-            placeholder="Search meetings or tags" 
-            className="input input-bordered w-full pl-8" // Add padding for icon
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-           {/* Search Icon */}
-           <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-base-content/50">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-           </span>
+          <label className="input input-bordered flex items-center gap-2">
+            <svg className="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g strokeLinejoin="round" strokeLinecap="round" strokeWidth="2.5" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></g></svg>
+            <input
+              ref={searchInputRef}
+              type="search"
+              className="grow bg-transparent focus:outline-none"
+              placeholder="Search recordings..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <kbd className="kbd kbd-sm">⌘</kbd>
+            <kbd className="kbd kbd-sm">K</kbd>
+          </label>
         </div>
 
-        {/* Recordings List - Use filtered list */}
+        {/* Recordings List - Use new list structure */} 
         <div className="flex-grow overflow-y-auto">
           {filteredRecordings.length === 0 ? (
-            <div className="text-base-content/70 text-sm p-2">
+            <div className="text-base-content/70 text-sm p-4 text-center">
               {recordings.length > 0 ? 'No matching recordings' : 'No recordings yet'}
             </div>
           ) : (
-            <ul className="menu bg-base-100 rounded-box p-2 gap-1"> {/* Reduced gap */} 
-              {filteredRecordings.map((recording) => ( 
-                <li key={recording.jsonPath} onClick={() => handleSelect(recording)}>
-                  <div className="hover:bg-base-200 rounded-lg p-3 cursor-pointer">
-                    <div className="flex flex-col gap-1">
-                       {/* Display Name */}
-                       <span className="font-medium text-sm mb-1 truncate">{recording.displayName}</span> 
-                       {/* Tags */} 
-                       {recording.tags && recording.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-1"> 
-                            {recording.tags.map(tag => (
-                                <div key={tag} className={`badge ${getTagColor(tag)} badge-sm`}>{tag}</div>
-                            ))}
-                        </div>
-                       )}
-                      <div className="flex justify-between text-xs text-base-content/70 mt-1">
-                        <span>{recording.date}</span> 
-                        <span>{recording.size}</span>
-                      </div>
-                    </div>
-                  </div>
-                </li>
+            // Use the list structure with list-row class on li
+             <ul className="list bg-base-100 rounded-box shadow-md">
+              {filteredRecordings.map((recording, index) => ( // Added index for optional numbering
+                <ListCard tags={recording.tags} onClick={() => handleSelect(recording)} key={index} index={index} title={recording.displayName} subtitle={recording.date} />
               ))}
             </ul>
           )}
