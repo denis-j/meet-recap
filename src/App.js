@@ -17,6 +17,9 @@ function App() {
   const [stream, setStream] = useState(null);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  // --- NEW: State for audio devices ---
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(''); // Store the selected device ID
 
   // Setup event listeners, including for API key management
   useEffect(() => {
@@ -67,26 +70,68 @@ function App() {
     };
   }, [stream, isRecording]); // Add isRecording dependency for the trigger listener check
 
+  // --- Effect to enumerate audio devices --- 
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputDevices = devices.filter(device => device.kind === 'audioinput');
+        setAudioDevices(audioInputDevices);
+        // Automatically select the default device if none is selected yet
+        if (audioInputDevices.length > 0 && !selectedDeviceId) {
+          const defaultDevice = audioInputDevices.find(d => d.deviceId === 'default');
+          setSelectedDeviceId(defaultDevice ? defaultDevice.deviceId : audioInputDevices[0].deviceId);
+        }
+      } catch (err) {
+        console.error("Error enumerating audio devices or getting permissions:", err);
+        // Handle lack of permission or no devices found appropriately in the UI later
+        setError("Could not get audio devices. Please ensure microphone permission is granted.");
+      }
+    };
+    getDevices();
+    
+    // Optional: Listen for device changes
+    navigator.mediaDevices.addEventListener('devicechange', getDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+    };
+  }, []); // Run once on mount
+
   // Handle start recording - No longer sends API key explicitly
   const startRecording = async () => {
     setResults(null); 
     setError(null);
     setStatus('requesting_access');
 
-    try {
-      // *** No need to get apiKeyToUse here, main process already has it ***
-      // const apiKeyToUse = apiKey; 
+    // Ensure a device is selected
+    if (!selectedDeviceId) {
+      setError("No audio input device selected.");
+      setStatus('error');
+      console.error('startRecording called without selectedDeviceId');
+      return;
+    }
+    console.log(`Attempting to use audio device: ${selectedDeviceId}`);
 
-      console.log("Attempting to get audio stream...");
+    try {
+      console.log("Attempting to get audio stream for specific device...");
       let audioStream;
       try {
-        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        console.log("Got audio stream successfully.");
+        // *** Use selectedDeviceId in constraints ***
+        const constraints = {
+          audio: { 
+            deviceId: { exact: selectedDeviceId } 
+          },
+          video: false
+        };
+        audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("Got audio stream successfully for device:", selectedDeviceId);
       } catch (err) {
-        console.error('Error getting audio stream:', err);
-        let userMessage = `Error getting microphone access: ${err.message}.`;
+        console.error('Error getting audio stream for device:', selectedDeviceId, err);
+        let userMessage = `Error getting access to selected microphone: ${err.message}.`;
         if (err.name === 'NotAllowedError') userMessage += ' Please grant microphone permission.';
-        else if (err.name === 'NotFoundError') userMessage += ' No microphone found.';
+        else if (err.name === 'NotFoundError') userMessage += ' Selected microphone not found.';
+        else if (err.name === 'OverconstrainedError') userMessage += ` Constraints not satisfied for device (Exact ID: ${selectedDeviceId}).`;
         setError(userMessage);
         setStatus('error');
         return;
@@ -211,6 +256,12 @@ function App() {
       // State will be updated via 'api-key-cleared' listener
   };
 
+  // --- NEW: Handler for device selection change ---
+  const handleDeviceChange = (deviceId) => {
+    setSelectedDeviceId(deviceId);
+    console.log("Selected audio device ID:", deviceId);
+  };
+
   return (
     <div className="drawer lg:drawer-open" data-theme="cupcake">
       <input id="recordings-drawer" type="checkbox" className="drawer-toggle" />
@@ -246,6 +297,10 @@ function App() {
                     stopRecording={stopRecording}
                     status={status}
                     stream={stream}
+                    // --- NEW PROPS --- 
+                    audioDevices={audioDevices}
+                    selectedDeviceId={selectedDeviceId}
+                    onDeviceChange={handleDeviceChange}
                   />
                 )}
                 
