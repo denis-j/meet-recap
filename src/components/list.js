@@ -2,9 +2,12 @@ import React from 'react';
 
 // Define a functional component for the song list that accepts props
 const ListCard = ({ index, title, subtitle, onClick, tags }) => {
+  // Calculate reversed index (total items - current index)
+  const reversedDisplayNumber = index + 1;
+
   return (
       <li className="list-row hover:bg-gray-800 cursor-pointer" onClick={onClick}>
-        <div className="text-4xl font-thin opacity-30 tabular-nums">{String(index).padStart(2, '0')}</div>
+        <div className="text-4xl font-thin opacity-30 tabular-nums">{String(reversedDisplayNumber).padStart(2, '0')}</div>
         <div className="list-col-grow">
           <div>{title}</div>
           <div className="text-xs uppercase font-semibold opacity-60">{subtitle}</div>

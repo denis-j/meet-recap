@@ -90,9 +90,20 @@ function Sidebar({ onSelectRecording }) {
           ) : (
             // Use the list structure with list-row class on li
              <ul className="list bg-base-100 rounded-box shadow-md">
-              {filteredRecordings.map((recording, index) => ( // Added index for optional numbering
-                <ListCard tags={recording.tags} onClick={() => handleSelect(recording)} key={index} index={index} title={recording.displayName} subtitle={recording.date} />
-              ))}
+              {filteredRecordings.map((recording, index) => { 
+                // Calculate reversed index here before passing to ListCard
+                const reversedIndex = filteredRecordings.length - 1 - index; 
+                return (
+                  <ListCard 
+                    tags={recording.tags} 
+                    onClick={() => handleSelect(recording)} 
+                    key={recording.jsonPath} // Use a stable key like jsonPath
+                    index={reversedIndex} // Pass the reversed index
+                    title={recording.displayName} 
+                    subtitle={recording.date} 
+                  />
+                );
+              })}
             </ul>
           )}
         </div>
