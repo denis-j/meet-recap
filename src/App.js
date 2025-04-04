@@ -293,7 +293,7 @@ function App() {
           </div> 
         </div> 
       </div> 
-      <Sidebar onSelectRecording={handleSelectRecording} />
+      <Sidebar onSelectRecording={handleSelectRecording} onStartMeeting={startRecording} />
     </div>
   );
 }

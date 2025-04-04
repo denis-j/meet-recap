@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import ListCard from './list';
 
 
-// Accept a function to handle selection
-function Sidebar({ onSelectRecording }) {
+// Accept a function to handle selection and onStartMeeting prop
+function Sidebar({ onSelectRecording, onStartMeeting }) {
   const [recordings, setRecordings] = useState([]);
   const [searchTerm, setSearchTerm] = useState(''); // State for search input
   const searchInputRef = useRef(null); // Create a ref for the input field
@@ -47,30 +47,23 @@ function Sidebar({ onSelectRecording }) {
     return nameMatch || tagMatch;
   });
 
-  // Simple function to get a color for a tag (can be expanded)
-  const getTagColor = (tag) => {
-    // Basic hash function for pseudo-random color based on tag name
-    let hash = 0;
-    for (let i = 0; i < tag.length; i++) {
-        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const colors = ['badge-primary', 'badge-secondary', 'badge-accent', 'badge-info', 'badge-success', 'badge-warning', 'badge-error'];
-    return colors[Math.abs(hash) % colors.length];
-  }
-
   return (
     <div className="drawer-side border-r border-base-300">
       <label htmlFor="recordings-drawer" className="drawer-overlay"></label>
-      <aside className="bg-base-200 w-64 min-h-full p-4 flex flex-col">
-        <div className="flex items-center mb-4">
+      <aside className="bg-base-200 w-64 h-full p-4 flex flex-col">
+        <div className="flex items-center mb-4 flex-shrink-0">
           <h3 className="font-bold text-lg text-left">Meetings</h3>
           <div className="ml-auto">
-            <button className="btn btn-primary btn-sm">Start Meeting</button>
+            <button 
+              className="btn btn-primary btn-sm"
+              onClick={onStartMeeting}
+            >
+              Start Meeting
+            </button>
           </div>
         </div>
         
-        {/* Search Input */} 
-        <div className="mb-4 relative">
+        <div className="mb-4 relative flex-shrink-0">
           <label className="input input-bordered flex items-center gap-2">
             <svg className="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g strokeLinejoin="round" strokeLinecap="round" strokeWidth="2.5" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></g></svg>
             <input
@@ -86,29 +79,27 @@ function Sidebar({ onSelectRecording }) {
           </label>
         </div>
 
-        {/* Recordings List - Use new list structure */} 
-        <div className="flex-grow overflow-y-auto">
+        {/* Recordings List - Hide scrollbar visually, keep functionality */}
+        <div className="flex-grow overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {filteredRecordings.length === 0 ? (
             <div className="text-base-content/70 text-sm p-4 text-center">
               {recordings.length > 0 ? 'No matching recordings' : 'No recordings yet'}
             </div>
           ) : (
-            // Use the list structure with list-row class on li
              <ul className="list bg-base-100 rounded-box shadow-md">
               {filteredRecordings.map((recording, index) => { 
-                // Calculate reversed index here before passing to ListCard
                 const reversedIndex = filteredRecordings.length - 1 - index; 
                 return (
                   <ListCard 
                     tags={recording.tags} 
                     onClick={() => handleSelect(recording)} 
-                    key={recording.jsonPath} // Use a stable key like jsonPath
-                    index={reversedIndex} // Pass the reversed index
+                    key={recording.jsonPath}
+                    index={reversedIndex}
                     title={recording.displayName} 
                     subtitle={recording.date} 
                   />
                 );
-              })}
+              })} 
             </ul>
           )}
         </div>
